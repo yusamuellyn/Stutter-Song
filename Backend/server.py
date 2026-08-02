@@ -5,10 +5,12 @@ import gc
 from whisperx.diarize import DiarizationPipeline
 import json 
 import firebase_admin 
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, storage 
 from datetime import datetime 
-
-
+from werkzeug.utils import secure_filename
+import mido
+import base64 
+import io
 device = "cpu"
 audio_path = "audio.mp3"
 
@@ -41,7 +43,34 @@ def detect_stutter():
         doc.collection("segments").document(str(i)).set(seg)
     return jsonify(result["segments"])
         
+
+@app.route("/upload-song", methods=["POST"])
+def uploadSong():
+    file = request.files["file"]
+    
+    song_id = request.form.get("id")
+    title = request.form.get("title")
+    artist = request.form.get("artist")
+    youtube_id = request.form.get("youtube-id")
+    threshold = request.form.get("threshold", type = int)
+
+ 
+    doc_data = {
+        "title": title,
+        "artist": artist,
+        "threshold": threshold,
+        "youtube-id": youtube_id,
+        "createdAt": firestore.SERVER_TIMESTAMP
+    }
+    db = firestore.client()
+    db.collection("songs").document(song_id).set(doc_data)
+    return jsonify({
+        "success": True,
+        "id": song_id,
+        "lyricsFound": len(lyrics),
+    }), 201
     
     
 if __name__ == "__main__":
     app.run(port=5001)
+
