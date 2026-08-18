@@ -46,10 +46,41 @@ async function uploadMemo(blob: Blob) {
     }
   };
 
+  // Liam - Understand This Too
+  const analyzeStutter = async () => {
+    
+    try {
+        const response = await fetch("http://127.0.0.1:5001/stutterSeverity", {
+          method: "POST",
+        });
+
+        
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error("Error:", errorData);
+          return;
+        }
+
+        const data = await response.json();
+        console.log("Stutter analysis result:", data);
+        // e.g. setStutterResult(data) if you want to display it
+
+    } catch (err) {
+        console.error("Request failed:", err);
+      }
+  };
+
   return (
-    <button onClick={handleRec}>
-      {recording ? "Stop" : "Record"}
-    </button>
+    <div>
+     <button onClick={handleRec}>
+       {recording ? "Stop" : "Record"}
+     </button>
+
+     <button onClick = {analyzeStutter}>
+      Analyze
+     </button>
+    </div>
   );
 }
 
@@ -59,7 +90,8 @@ export default function Home() {
 
 
   useEffect(() => {
-    fetch("http://localhost:5001/get-sentence")
+    fetch("http://127.0.0.1:5001/get-sentence")
+    // fetch("http://localhost:5001/get-sentence")
       .then((res) => res.json())
       .then((data) => setSentence(data.sentence));
   }, []);
