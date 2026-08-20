@@ -257,13 +257,33 @@ def stutterSeverity():
             "id": recordingName,
             
         }), 201
+    
+def level(recording_name):
+    doc = db.collection("stutters").document(recording_name).get()
+    data = doc.to_dict()
+    return data.get("stutterLevel")
 
 @app.route("/display-song", methods = ["GET"])
 def displaySong():
- doc_ref = db.collection() # Placeholder
+    recording_name = request.args.get("recordingName")
+    severity = level(recording_name)
+    
+    song_ref = db.collection("songs").where("threshold", "==", severity).stream()
+    songs = []
+    for doc in song_ref: 
+        data = doc.to_dict()
+        data["id"] = data.id
+        songs.append(data)
+    if doc.exists:
+        data = doc.to_dict()
+        data["id"] = doc.id
+        return jsonify(data), 200
 
-def level():
- doc_ref = db.collection() # Placeholder
+# 60 - 87 bpm = Major Stutter 
+# 87 - 113 bpm = Average Stutter 
+# 113 - 140 bpm = Minor Stutter 
+# 140+ = No Stutter 
+
 
 
 
