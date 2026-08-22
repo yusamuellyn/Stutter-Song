@@ -303,7 +303,7 @@ def displaySong():
 
 
 
-@app.route("display_SevAndRecs", methods = ["GET"])
+@app.route("/display_SevAndRecs", methods = ["GET"])
 def displayInfo():
 
     last_version = get_latest_version()
