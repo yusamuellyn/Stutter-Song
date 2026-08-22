@@ -302,17 +302,24 @@ def displaySong():
         return jsonify(data), 200
 
 
-
+# Sam Adds Song Rec Display
 @app.route("/display_SevAndRecs", methods = ["GET"])
 def displayInfo():
 
     last_version = get_latest_version()
+    if last_version is None:
+     return jsonify({"error": "No Previous Versions Found"}), 400
     rec_num = f"Recording_v{last_version}"
-    sev_ref = db.collection("stutters").document(f"{rec_num}").collection("stutterLevel")
+    sev_ref = db.collection("stutters").document(f"{rec_num}")
     doc = sev_ref.get()  # fetches the document from Firestore
     
     if not doc.exists:
         return jsonify({"error": "document not found"}), 404
+
+    data = doc.to_dict()  # turns the document into a normal Python dict
+    sL = data.get("stutterLevel")
+    
+    return jsonify({"StutterLevel": sL})
    
 
 if __name__ == "__main__":

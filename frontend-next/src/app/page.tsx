@@ -21,6 +21,7 @@ async function uploadMemo(blob: Blob) {
     const [upload, setUpload] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
+    const [analysisResult, setAnalysisResult] = useState(false);
 
     const handleRec = async () => {
     if (!recording) {
@@ -71,7 +72,7 @@ async function uploadMemo(blob: Blob) {
 
         const data = await response.json();
         console.log("Stutter analysis result:", data);
-        // e.g. setStutterResult(data) if you want to display it
+        setAnalysisResult(data);
 
     } catch (err) {
         console.error("Request failed:", err);
