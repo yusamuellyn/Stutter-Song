@@ -17,6 +17,18 @@ from datetime import datetime
 from collections import Counter
 
 
+def get_next_version():
+    existing = [f for f in os.listdir(audio_folder) if f.startswith("most_recent_rec_v")]
+    if not existing:
+        return 1
+    return max(get_version_number(f) for f in existing) + 1
+
+def get_latest_version():
+    existing = [f for f in os.listdir(audio_folder) if f.startswith("most_recent_rec_v")]
+    if not existing:
+        return None
+    return max(get_version_number(f) for f in existing)
+
 device = "cpu"
 
 audio_folder = "recordings"
@@ -45,28 +57,27 @@ def get_version_number(filename):
 
 @app.route("/transcribe", methods=["POST"])
 def detect_stutter(audio_path = None):
-    
     wordScores = []
     textParts = []
-    # Understand Database Assurance Code
-    existing = [f for f in os.listdir(audio_folder) if f.startswith("most_recent_rec_v")]
 
-    if audio_path == None: # Changed To Allow For Ease Of Running
-        if not existing:
+    # Understand
+    if audio_path is None:
+        version_num = get_latest_version()
+        if version_num is None:
             return jsonify({"Error: No Previous Versions Found"}), 400
+        audio_path = os.path.join(audio_folder, f"most_recent_rec_v{version_num}.mp4")
+    else:
+        version_num = get_version_number(os.path.basename(audio_path))
 
-        
 
-        latest_file = max(existing, key=get_version_number)
-        audio_path = os.path.join(audio_folder, latest_file)
-    
-    
     audio = whisperx.load_audio(audio_path)
     model = whisperx.load_model("large-v3", device)
     result = model.transcribe(audio, batch_size=16)
 
-    base_filename = os.path.basename(audio_path)
-    version_num = get_version_number(base_filename)
+    # base_filename = os.path.basename(audio_path)
+    # version_num = get_version_number(base_filename)
+
+    
     
     model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=device)
     result = whisperx.align(result["segments"], model_a, metadata, audio, device)
@@ -129,13 +140,15 @@ def makeRecording():
     if not allowed_file(recording_file.filename):
       return jsonify({"error": "Not correct file type"}), 400
 
-    ext = recording_file.filename.rsplit(".", 1)[1].lower()
     
-
-
-    existing = [f for f in os.listdir(audio_folder) if f.startswith("most_recent_rec_v")]
-    version = len(existing) + 1
+    
+    version = get_next_version()
     filename = f"most_recent_rec_v{version}.mp4"
+
+    # existing = [f for f in os.listdir(audio_folder) if f.startswith("most_recent_rec_v")]
+    # version = len(existing) + 1
+    # filename = f"most_recent_rec_v{version}.mp4"
+
     filepath = os.path.join(audio_folder, filename)
 
     recording_file.save(filepath)
@@ -148,7 +161,9 @@ def makeRecording():
     "size_kb": round(os.path.getsize(filepath) / 1024, 1),
     **transcribe_file # ** Splits File Correctly
     }), 201
-    
+
+
+  
 
 
 @app.route("/upload-song", methods=["POST"])
@@ -182,13 +197,20 @@ def uploadSong():
 def stutterSeverity():
 
     stutterLevel = "None"
-    existing = [f for f in os.listdir(audio_folder) if f.startswith("most_recent_rec_v")]
+    # existing = [f for f in os.listdir(audio_folder) if f.startswith("most_recent_rec_v")]
     
-    if not existing:
-        return jsonify({"Error: No Previous Versions Found"}), 400
+    # if not existing:
+    #     return jsonify({"Error: No Previous Versions Found"}), 400
 
-    last_file = max(existing, key=get_version_number)
-    version_num = get_version_number(last_file)
+    # last_file = max(existing, key=get_version_number)
+    # version_num = get_version_number(last_file)
+
+    version_num = get_latest_version()
+    if version_num is None:
+     return jsonify({"Error: No Previous Versions Found"}), 400
+
+    
+    
     
     doc_ref = db.collection("transcripts").document(f"Recording_v{version_num}")
 
@@ -279,14 +301,18 @@ def displaySong():
         data["id"] = doc.id
         return jsonify(data), 200
 
-# 60 - 87 bpm = Major Stutter 
-# 87 - 113 bpm = Average Stutter 
-# 113 - 140 bpm = Minor Stutter 
-# 140+ = No Stutter 
 
 
+@app.route("display_SevAndRecs", methods = ["GET"])
+def displayInfo():
 
-
+    last_version = get_latest_version()
+    rec_num = f"Recording_v{last_version}"
+    sev_ref = db.collection("stutters").document(f"{rec_num}").collection("stutterLevel")
+    doc = sev_ref.get()  # fetches the document from Firestore
+    
+    if not doc.exists:
+        return jsonify({"error": "document not found"}), 404
    
 
 if __name__ == "__main__":

@@ -32,8 +32,15 @@ async function uploadMemo(blob: Blob) {
       recorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType });
         stream.getTracks().forEach((t) => t.stop());
-        await uploadMemo(blob); // Part 2
-      };
+        
+        setUpload(true);        // mark upload/transcription as in progress
+        try {
+         await uploadMemo(blob);
+       } finally {
+        setUpload(false);     // done (success or fail)
+       }
+    };
+      
 
       recorder.start();
       mediaRecorderRef.current = recorder;
@@ -84,12 +91,13 @@ async function uploadMemo(blob: Blob) {
        {recording ? "Stop" : "Record"}
      </button>
 
-     <button
-       onClick={analyzeStutter}
-       className="w-40 rounded-full border border-stone-300 px-6 py-3 text-sm font-semibold text-stone-700 transition-colors duration-200 hover:border-[#2E8B57] hover:text-[#2E8B57]"
+     <button onClick={analyzeStutter} 
+     disabled={upload}
+     className="w-40 rounded-full border border-stone-300 px-6 py-3 text-sm font-semibold text-stone-700 transition-colors duration-200 hover:border-[#2E8B57] hover:text-[#2E8B57]"
      >
-      Analyze
+      {upload ? "Processing" : "Analyzation Available"}
      </button>
+     
     </div>
   );
 }
