@@ -30,6 +30,7 @@ def get_latest_version():
     return max(get_version_number(f) for f in existing)
 
 device = "cpu"
+ts_model = whisperx.load_model("large-v3", device)
 
 audio_folder = "recordings"
 os.makedirs(audio_folder, exist_ok= True)
@@ -71,8 +72,8 @@ def detect_stutter(audio_path = None):
 
 
     audio = whisperx.load_audio(audio_path)
-    model = whisperx.load_model("large-v3", device)
-    result = model.transcribe(audio, batch_size=16)
+    # model = whisperx.load_model("large-v3", device)
+    result = ts_model.transcribe(audio, batch_size=16)
 
     # base_filename = os.path.basename(audio_path)
     # version_num = get_version_number(base_filename)
@@ -303,7 +304,7 @@ def displaySong():
 
 
 # Sam Adds Song Rec Display
-@app.route("/display_SevAndRecs", methods = ["GET"])
+@app.route("/displaySev", methods = ["GET"])
 def displayInfo():
 
     last_version = get_latest_version()

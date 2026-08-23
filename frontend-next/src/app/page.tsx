@@ -21,9 +21,11 @@ async function uploadMemo(blob: Blob) {
     const [upload, setUpload] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
-    const [analysisResult, setAnalysisResult] = useState(false);
+    const [stutterResult, setStutterResult] = useState(null);
+    // False or True For Bool / Null For Objects In useState
 
     const handleRec = async () => {
+    setStutterResult(null)
     if (!recording) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
@@ -70,14 +72,32 @@ async function uploadMemo(blob: Blob) {
           return;
         }
 
-        const data = await response.json();
-        console.log("Stutter analysis result:", data);
-        setAnalysisResult(data);
+        await displayStutter()
 
     } catch (err) {
         console.error("Request failed:", err);
       }
-  };
+   };
+
+    const displayStutter = async () => {
+     
+     const response = await fetch("http://localhost:5001/displaySev", {
+     method: "GET",
+  
+     });
+
+     if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Error:", errorData);
+      return;
+      }
+
+     const data = await response.json();
+
+     setStutterResult(data.StutterLevel);
+    
+
+    };
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -98,6 +118,12 @@ async function uploadMemo(blob: Blob) {
      >
       {upload ? "Processing" : "Analyzation Available"}
      </button>
+
+     {!upload && stutterResult && (
+        <p className="mt-6 font-serif text-lg text-stone-900">
+          Result: {stutterResult}
+        </p>
+      )}
      
     </div>
   );
