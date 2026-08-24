@@ -15,19 +15,28 @@ import random
 from flask_cors import CORS
 from datetime import datetime
 from collections import Counter
+import uuid 
 
 
-def get_next_version():
-    existing = [f for f in os.listdir(audio_folder) if f.startswith("most_recent_rec_v")]
+def get_next_version(user_folder):
+    existing = [f for f in os.listdir(user_folder) if f.startswith("rec_v")]
     if not existing:
         return 1
     return max(get_version_number(f) for f in existing) + 1
 
-def get_latest_version():
-    existing = [f for f in os.listdir(audio_folder) if f.startswith("most_recent_rec_v")]
+def get_latest_version(user_folder):
+    if not os.path.isdir(user_folder):
+        return None
+    existing = [f for f in os.listdir(user_folder) if f.startswith("rec_v")]
     if not existing:
         return None
     return max(get_version_number(f) for f in existing)
+
+def get_user_folder(user_id):
+    folder = os.path.join(audio_folder, user_id)
+    os.makedirs(folder, exist_ok=True)
+    return folder
+
 
 device = "cpu"
 ts_model = whisperx.load_model("large-v3", device)
@@ -57,13 +66,16 @@ def get_version_number(filename):
 
 
 @app.route("/transcribe", methods=["POST"])
-def detect_stutter(audio_path = None):
+def detect_stutter(audio_path = None, user_id = None, version_num = None):
     wordScores = []
     textParts = []
 
     # Understand
     if audio_path is None:
-        version_num = get_latest_version()
+        if user_id is None:
+            return jsonify({"error": "userId required"}), 400
+        user_folder = get_user_folder(user_id)
+        version_num = get_latest_version(user_folder)
         if version_num is None:
             return jsonify({"Error: No Previous Versions Found"}), 400
         audio_path = os.path.join(audio_folder, f"most_recent_rec_v{version_num}.mp4")
@@ -90,10 +102,11 @@ def detect_stutter(audio_path = None):
 
     textTranscription = " ".join(textParts)
 
-    doc = db.collection("transcripts").document(f"Recording_v{version_num}")
+    doc = db.collection("transcripts").document(f"{user_id}_v{version_num}")
     doc.set({
         "created_at": datetime.utcnow(),
-        "audio_path": audio_path
+        "audio_path": audio_path,
+        "userId": user_id,
     })
     for i, seg in enumerate(result["segments"]):
         doc.collection("segments").document(str(i)).set(seg)
@@ -140,31 +153,33 @@ def makeRecording():
 
     if not allowed_file(recording_file.filename):
       return jsonify({"error": "Not correct file type"}), 400
-
+  
+    # Generate userID
+    user_id = request.form.get("userID") or str(uuid.uuid4())
     
+    user_folder = get_user_folder(user_id)
+    version = get_next_version(user_folder)
+    filename = f"rec_v{version}.mp4"
     
-    version = get_next_version()
-    filename = f"most_recent_rec_v{version}.mp4"
 
     # existing = [f for f in os.listdir(audio_folder) if f.startswith("most_recent_rec_v")]
     # version = len(existing) + 1
     # filename = f"most_recent_rec_v{version}.mp4"
 
-    filepath = os.path.join(audio_folder, filename)
+    filepath = os.path.join(user_folder, filename)
 
     recording_file.save(filepath)
 
-    transcribe_file = detect_stutter(filepath)
+    transcribe_file = detect_stutter(filepath, user_id, version)
 
     return jsonify({
     "message": "Voice memo saved",
+    "userId": user_id,
     "filename": filename,
     "size_kb": round(os.path.getsize(filepath) / 1024, 1),
     **transcribe_file # ** Splits File Correctly
     }), 201
 
-
-  
 
 
 @app.route("/upload-song", methods=["POST"])
@@ -175,7 +190,7 @@ def uploadSong():
     title = request.form.get("title")
     artist = request.form.get("artist")
     youtube_id = request.form.get("youtube-id")
-    threshold = request.form.get("threshold", type = int)
+    threshold = request.form.get("threshold")
 
  
     doc_data = {
@@ -196,6 +211,15 @@ def uploadSong():
 # Need To Call This Endpoint When Done, Do Most By Self
 @app.route("/stutterSeverity", methods = ["POST", "GET"])
 def stutterSeverity():
+    user_id = request.args.get("userId") or request.form.get("userId")
+    if not user_id:
+        return jsonify({"error": "userId required"}), 400
+    
+    user_folder = get_user_folder(user_id)
+    version_num = get_latest_version(user_folder)
+    if version_num is None:
+        return jsonify({"error": "No previous versions found"}), 400
+    
 
     stutterLevel = "None"
     # existing = [f for f in os.listdir(audio_folder) if f.startswith("most_recent_rec_v")]
@@ -206,14 +230,7 @@ def stutterSeverity():
     # last_file = max(existing, key=get_version_number)
     # version_num = get_version_number(last_file)
 
-    version_num = get_latest_version()
-    if version_num is None:
-     return jsonify({"Error: No Previous Versions Found"}), 400
-
-    
-    
-    
-    doc_ref = db.collection("transcripts").document(f"Recording_v{version_num}")
+    doc_ref = db.collection("transcripts").document(f"{user_id}_v{version_num}")
 
     text_doc = doc_ref.collection("text").document("full").get()
     scores_doc = doc_ref.collection("scores").document("full").get()
@@ -264,7 +281,7 @@ def stutterSeverity():
     else:
         stutterLevel = "No Stutter"
 
-    recordingName = f"Recording_v{version_num}"
+    recordingName = f"{user_id}_v{version_num}"
 
 
     # Liam - Understand Below  
@@ -288,31 +305,44 @@ def level(recording_name):
 
 @app.route("/display-song", methods = ["GET"])
 def displaySong():
-    recording_name = request.args.get("recordingName")
-    severity = level(recording_name)
-    
+    user_id = request.args.get("userId")
+    if not user_id:
+        return jsonify({"error": "userId required"}), 400
+
+    user_folder = get_user_folder(user_id)
+    version_num = get_latest_version(user_folder)
+    if version_num is None:
+        return jsonify({"error": "No previous versions found"}), 400
+
+    severity = level(f"{user_id}_v{version_num}")
+
     song_ref = db.collection("songs").where("threshold", "==", severity).stream()
     songs = []
-    for doc in song_ref: 
-        data = doc.to_dict()
-        data["id"] = data.id
-        songs.append(data)
-    if doc.exists:
+    for doc in song_ref:
         data = doc.to_dict()
         data["id"] = doc.id
-        return jsonify(data), 200
+        songs.append(data)
+
+    if not songs:
+        return jsonify({"error": "No matching song found"}), 404
+
+    return jsonify(songs[0]), 200
 
 
 # Sam Adds Song Rec Display
 @app.route("/displaySev", methods = ["GET"])
 def displayInfo():
-
-    last_version = get_latest_version()
+    user_id = request.args.get("userId")
+    if not user_id: 
+        return jsonify({"error": "userId required"}), 400
+    
+    user_folder = get_user_folder(user_id)
+    last_version = get_latest_version(user_folder)
     if last_version is None:
      return jsonify({"error": "No Previous Versions Found"}), 400
-    rec_num = f"Recording_v{last_version}"
-    sev_ref = db.collection("stutters").document(f"{rec_num}")
-    doc = sev_ref.get()  # fetches the document from Firestore
+ 
+    rec_id = f"{user_id}_v{last_version}"
+    doc = db.collection("stutters").document(rec_id).get()
     
     if not doc.exists:
         return jsonify({"error": "document not found"}), 404
