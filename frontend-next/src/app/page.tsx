@@ -89,8 +89,16 @@ function RecordingButton() {
       }
 
       const data = await displayStutter();
+
+      const songRes = await fetch(
+        `http://127.0.0.1:5001/display-song?userId=${userIdRef.current}`
+      );
+      const songData = await songRes.json();
+
       const params = new URLSearchParams({
         level: String(data.StutterLevel),
+        youtubeId: songData.youtubeId ?? "",
+        songTitle: songData.title ?? "",
       });
       router.push(`/result?${params.toString()}`);
     } catch (err) {
