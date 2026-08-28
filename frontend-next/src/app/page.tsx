@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-async function uploadMemo(blob: Blob, userId:string) {
+async function uploadMemo(blob: Blob, userId:string, sentenceIndex: number) {
   const formData = new FormData();
   formData.append("recording", blob, "recording.mp4");
+  formData.append("sentenceIndex", String(sentenceIndex))
 
   if(userId){
     formData.append("userID", userId);
@@ -26,15 +27,25 @@ function saveUserId(id: string){
   localStorage.setItem("userId", id);
 }
 
-
-function RecordingButton() {
+interface RecordingButtonProps{
+  sentences: string[];
+  currentIndex: number;
+  setCurrentIndex: (i: number) => void;
+}
+function RecordingButton({sentences, currentIndex, setCurrentIndex}: RecordingButtonProps) {
   const router = useRouter();
   const [recording, setRecording] = useState(false);
-  const [upload, setUpload] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const [stutterResult, setStutterResult] = useState(null);
   const userIdRef = useRef<string>("");
+  const totalSentences = sentences.length;
+  const allRecorded = totalSentences > 0 && currentIndex >= totalSentences;
+  const queueRef = useRef<{blob: Blob; sentenceIndex: number}[]>([]);
+  const processingRef = useRef(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const allSaved = allRecorded && pendingCount === 0;
+
 
   useEffect(() => {
     userIdRef.current = getUserId(); // empty string on first-ever visit — that's fine
@@ -48,20 +59,15 @@ function RecordingButton() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       chunksRef.current = [];
+      const sentenceIndexForThisTake = currentIndex;
 
       recorder.ondataavailable = (e) => chunksRef.current.push(e.data);
-      recorder.onstop = async () => {
+      recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType });
         stream.getTracks().forEach((t) => t.stop());
-
-        setUpload(true); // mark upload/transcription as in progress
-        try {
-          const result = await uploadMemo(blob, userIdRef.current);
-          userIdRef.current = result.userId;
-          saveUserId(result.userId);
-        } finally {
-          setUpload(false); // done (success or fail)
-        }
+        
+        enqueueUpload(blob, sentenceIndexForThisTake);
+        setCurrentIndex(sentenceIndexForThisTake + 1);
       };
 
       recorder.start();
@@ -73,6 +79,34 @@ function RecordingButton() {
       }
       setRecording(false);
     }
+  };
+
+  const processQueue = async () => {
+    if (processingRef.current) return;
+    processingRef.current = true;
+  
+    while (queueRef.current.length > 0) {
+      const next = queueRef.current.shift()!;
+      try {
+        const result = await uploadMemo(next.blob, userIdRef.current, next.sentenceIndex);
+        if (result?.userId) {
+          userIdRef.current = result.userId;
+          saveUserId(result.userId);
+        }
+      } catch (err) {
+        console.error("Upload failed for sentence", next.sentenceIndex, err);
+      } finally {
+        setPendingCount((c) => Math.max(0, c - 1));
+      }
+    }
+  
+    processingRef.current = false;
+  };
+  
+  const enqueueUpload = (blob: Blob, sentenceIndex: number) => {
+    queueRef.current.push({ blob, sentenceIndex });
+    setPendingCount((c) => c + 1);
+    processQueue();
   };
 
   // Liam - Understand This Too
@@ -123,26 +157,39 @@ function RecordingButton() {
 
   return (
     <div className="flex flex-col items-center gap-4">
+      {totalSentences > 0 && (
+        <p className="font-mono text-xs uppercase tracking-[0.15em] text-stone-500">
+          {allRecorded ? "All sentences recorded" : `Sentence ${currentIndex + 1} of ${totalSentences}`}
+        </p>
+      )}
+
+      {pendingCount > 0 && (
+        <p className="font-mono text-xs text-stone-400">
+          Saving {pendingCount} recording{pendingCount > 1 ? "s" : ""}...
+        </p>
+      )}
+
       <button
         onClick={handleRec}
+        disabled={allRecorded}
         className={`w-40 rounded-full px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors duration-200 ${
           recording
             ? "bg-amber-500 hover:bg-amber-600"
             : "bg-[#2E8B57] hover:bg-[#256e46]"
-        }`}
+        } disabled:cursor-not-allowed disabled:opacity-50`}
       >
         {recording ? "Stop" : "Record"}
       </button>
 
       <button
         onClick={analyzeStutter}
-        disabled={upload}
-        className="w-40 rounded-full border border-stone-300 px-6 py-3 text-sm font-semibold text-stone-700 transition-colors duration-200 hover:border-[#2E8B57] hover:text-[#2E8B57]"
+        disabled={!allSaved}
+        className="w-40 rounded-full border border-stone-300 px-6 py-3 text-sm font-semibold text-stone-700 transition-colors duration-200 hover:border-[#2E8B57] hover:text-[#2E8B57] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {upload ? "Processing" : "Analyzation Available"}
+        {allRecorded && !allSaved ? "Saving..." : "Analyzation Available"}
       </button>
 
-      {!upload && stutterResult && (
+      {stutterResult && (
         <p className="mt-6 font-serif text-lg text-stone-900">
           Result: {stutterResult}
         </p>
@@ -152,27 +199,43 @@ function RecordingButton() {
 }
 
 export default function Home() {
-  const [sentence, setSentence] = useState(null);
+const [sentences, setSentences] = useState<string[]>([]);
+const [currentIndex, setCurrentIndex] = useState(0);
 
-  useEffect(() => {
-    fetch("http://127.0.0.1:5001/get-sentence")
-      .then((res) => res.json())
-      .then((data) => setSentence(data.sentence));
-  }, []);
+useEffect(() => {
+  fetch("http://127.0.0.1:5001/get-sentence")
+    .then((res) => res.json())
+    .then((data) => setSentences(data.sentence ?? []));
+}, []);
 
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F4FAF7] px-4">
-      <div className="w-full max-w-md rounded-3xl border border-stone-200 bg-white p-10 text-center shadow-sm">
-        <p className="mb-6 font-mono text-xs uppercase tracking-[0.2em] text-[#2E8B57]">
-          StutterSong
-        </p>
+return (
+  <main className="flex min-h-screen items-center justify-center bg-[#F4FAF7] px-4">
+    <div className="w-full max-w-md rounded-3xl border border-stone-200 bg-white p-10 text-center shadow-sm">
+      <p className="mb-6 font-mono text-xs uppercase tracking-[0.2em] text-[#2E8B57]">
+        StutterSong
+      </p>
 
-        <p className="font-serif text-2xl leading-snug text-stone-900"> {sentence} </p>
+      <ol className="space-y-4 text-left">
+        {sentences.map((s, i) => {
+          const isActive = i === currentIndex;
+          const isDone = i < currentIndex;
+          return (
+            <li key={i} className={`font-serif text-2xl leading-snug ${isActive ? "text-stone-900" : isDone ? "text-stone-400 line-through" : "text-stone-300"}`}>
+              <span className="mr-2 font-mono text-sm text-[#2E8B57] align-top">{i + 1}.</span>
+              {s}
+            </li>
+          );
+        })}
+      </ol>
 
-        <div className="my-8 h-px bg-stone-200" />
+      <div className="my-8 h-px bg-stone-200" />
 
-        <RecordingButton />
-      </div>
-    </main>
-  );
+      <RecordingButton
+        sentences={sentences}
+        currentIndex={currentIndex}
+        setCurrentIndex={setCurrentIndex}
+      />
+    </div>
+  </main>
+);
 }

@@ -37,6 +37,15 @@ def get_user_folder(user_id):
     os.makedirs(folder, exist_ok=True)
     return folder
 
+def get_last_n_versions(user_folder, n=3):
+    if not os.path.isdir(user_folder):
+        return []
+    existing = [f for f in os.listdir(user_folder) if f.startswith("rec_v")]
+    if not existing:
+        return []
+    versions = sorted({get_version_number(f) for f in existing}, reverse=True)
+    return versions[:n]
+
 
 device = "cpu"
 ts_model = whisperx.load_model("large-v3", device)
@@ -126,7 +135,7 @@ def detect_stutter(audio_path = None, user_id = None, version_num = None):
 @app.route("/get-sentence", methods = ["GET"])
 def getSentence():
 
-    randomSentenceNum = random.randrange(1,16)
+    randomSentenceNums = random.sample(range(1,16),3)
 
  
     doc_ref = db.collection("Sentences").document("SkROjYeo8NiV76JyRnfR")
@@ -136,9 +145,9 @@ def getSentence():
         return jsonify({"error": "document not found"}), 404
 
     data = doc.to_dict()  # turns the document into a normal Python dict
-    sentence = data.get(f"Sentence{randomSentenceNum}")
+    sentences = [data.get(f"Sentence{n}") for n in randomSentenceNums]
 
-    return jsonify({"sentence": sentence})
+    return jsonify({"sentence": sentences})
 
 
 @app.route("/makeRecording", methods = ["POST"])
@@ -154,6 +163,7 @@ def makeRecording():
     if not allowed_file(recording_file.filename):
       return jsonify({"error": "Not correct file type"}), 400
   
+    sentence_index = request.form.get("sentenceIndex")
     # Generate userID
     user_id = request.form.get("userID") or str(uuid.uuid4())
     
@@ -176,6 +186,7 @@ def makeRecording():
     "message": "Voice memo saved",
     "userId": user_id,
     "filename": filename,
+    "sentenceIndex": sentence_index,
     "size_kb": round(os.path.getsize(filepath) / 1024, 1),
     **transcribe_file # ** Splits File Correctly
     }), 201
@@ -216,12 +227,14 @@ def stutterSeverity():
         return jsonify({"error": "userId required"}), 400
     
     user_folder = get_user_folder(user_id)
-    version_num = get_latest_version(user_folder)
-    if version_num is None:
+    versions= get_last_n_versions(user_folder, 3)
+    if not versions:
         return jsonify({"error": "No previous versions found"}), 400
     
-
     stutterLevel = "None"
+    
+    scores = []
+    number_Stutters = 0
     # existing = [f for f in os.listdir(audio_folder) if f.startswith("most_recent_rec_v")]
     
     # if not existing:
@@ -230,43 +243,45 @@ def stutterSeverity():
     # last_file = max(existing, key=get_version_number)
     # version_num = get_version_number(last_file)
 
-    doc_ref = db.collection("transcripts").document(f"{user_id}_v{version_num}")
+    for version_num in versions:
+        doc_ref = db.collection("transcripts").document(f"{user_id}_v{version_num}")
 
-    text_doc = doc_ref.collection("text").document("full").get()
-    scores_doc = doc_ref.collection("scores").document("full").get()
+        text_doc = doc_ref.collection("text").document("full").get()
+        scores_doc = doc_ref.collection("scores").document("full").get()
 
 
-    if not text_doc.exists or not scores_doc.exists:
-     return jsonify({"Error": "Transcript or scores not found"}), 404
+        if not text_doc.exists or not scores_doc.exists:
+            continue
 
-    text_data = text_doc.to_dict()
-    scores_data = scores_doc.to_dict()
+        text_data = text_doc.to_dict()
+        scores_data = scores_doc.to_dict()
 
-    text = text_data["text"]
-    scores = scores_data["scores"]
+        text = text_data["text"]
+        version_scores = scores_data["scores"]
+
+        if not version_scores:
+            continue
+        
+        scores.extend(version_scores)
+
+        separate_text = text.split()
+        separate_text = [word.lower().strip() for word in separate_text]
+        w = 0
+        while w < len(separate_text):
+            if (w + 1 < len(separate_text)) and separate_text[w] == separate_text[w + 1]:
+                number_Stutters += 1
+            w += 1
+        
 
     if not scores:
         return jsonify({"Error: No Scores Found"}), 404
 
-    separate_text = text.split() # New Variable: Divide Text Into Array Of Words
-    avg_Word_Score = 0 # Avg Score Of Each Item In Scores
-
-    number_Stutters = 0 
+    avg_Word_Score = 0 
 
     for s in scores:
         avg_Word_Score = avg_Word_Score + float(s)
 
     avg_Word_Score = avg_Word_Score / len(scores)
-
-
-    separate_text = [word.lower().strip() for word in separate_text]
-    w = 0 
-
-    while w < len(separate_text):
-        if (w + 1 < len(separate_text)) and separate_text[w] == separate_text[w + 1]:
-            number_Stutters += 1
-
-        w += 1
 
     
     if avg_Word_Score <= .400 and number_Stutters == 1:
@@ -281,7 +296,7 @@ def stutterSeverity():
     else:
         stutterLevel = "No Stutter"
 
-    recordingName = f"{user_id}_v{version_num}"
+    recordingName = f"{user_id}_v{versions[0]}"
 
 
     # Liam - Understand Below  
