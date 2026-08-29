@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
-async function uploadMemo(blob: Blob, userId:string) {
+async function uploadMemo(blob: Blob, userId:string, SRI:string | null) {
   const formData = new FormData();
   formData.append("recording", blob, "recording.mp4");
 
   if(userId){
     formData.append("userID", userId);
   }
+  if(SRI){formData.append("SRI", SRI )}
 
   const response = await fetch("http://localhost:5001/makeRecording", {
     method: "POST",
@@ -27,7 +28,7 @@ function saveUserId(id: string){
 }
 
 
-function RecordingButton() {
+function RecordingButton({ SRI }: { SRI: string | null }) {
   const router = useRouter();
   const [recording, setRecording] = useState(false);
   const [upload, setUpload] = useState(false);
@@ -56,7 +57,7 @@ function RecordingButton() {
 
         setUpload(true); // mark upload/transcription as in progress
         try {
-          const result = await uploadMemo(blob, userIdRef.current);
+          const result = await uploadMemo(blob, userIdRef.current, SRI);
           userIdRef.current = result.userId;
           saveUserId(result.userId);
         } finally {
@@ -153,12 +154,16 @@ function RecordingButton() {
 
 export default function Home() {
   const [sentence, setSentence] = useState(null);
+  const [SRI, setSRI] = useState(null);
 
   useEffect(() => {
     fetch("http://127.0.0.1:5001/get-sentence")
-      .then((res) => res.json())
-      .then((data) => setSentence(data.sentence));
-  }, []);
+    .then((res) => res.json())
+    .then((data) => {
+      setSentence(data.sentence);
+      setSRI(data.SRI);
+    });
+}, []);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#F4FAF7] px-4">
@@ -171,7 +176,7 @@ export default function Home() {
 
         <div className="my-8 h-px bg-stone-200" />
 
-        <RecordingButton />
+        <RecordingButton SRI = {SRI} />
       </div>
     </main>
   );

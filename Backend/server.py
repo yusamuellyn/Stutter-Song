@@ -66,7 +66,7 @@ def get_version_number(filename):
 
 
 @app.route("/transcribe", methods=["POST"])
-def detect_stutter(audio_path = None, user_id = None, version_num = None):
+def detect_stutter(audio_path = None, user_id = None, version_num = None, sentence_text = None):
     wordScores = []
     textParts = []
 
@@ -78,7 +78,7 @@ def detect_stutter(audio_path = None, user_id = None, version_num = None):
         version_num = get_latest_version(user_folder)
         if version_num is None:
             return jsonify({"Error: No Previous Versions Found"}), 400
-        audio_path = os.path.join(audio_folder, f"most_recent_rec_v{version_num}.mp4")
+        audio_path = os.path.join(user_folder, f"rec_v{version_num}.mp4")
     else:
         version_num = get_version_number(os.path.basename(audio_path))
 
@@ -107,6 +107,7 @@ def detect_stutter(audio_path = None, user_id = None, version_num = None):
         "created_at": datetime.utcnow(),
         "audio_path": audio_path,
         "userId": user_id,
+        "sentence": sentence_text
     })
     for i, seg in enumerate(result["segments"]):
         doc.collection("segments").document(str(i)).set(seg)
@@ -138,7 +139,10 @@ def getSentence():
     data = doc.to_dict()  # turns the document into a normal Python dict
     sentence = data.get(f"Sentence{randomSentenceNum}")
 
-    return jsonify({"sentence": sentence})
+    sentence_rem_id = str(uuid.uuid4())
+    db.collection("sentenceRems").document(sentence_rem_id).set({"sentence": sentence})
+
+    return jsonify({"sentence": sentence, "SRI": sentence_rem_id})
 
 
 @app.route("/makeRecording", methods = ["POST"])
@@ -156,6 +160,14 @@ def makeRecording():
   
     # Generate userID
     user_id = request.form.get("userID") or str(uuid.uuid4())
+
+    SRI = request.form.get("SRI")
+
+    sentence = None
+    if SRI:
+      sentence_doc = db.collection("sentenceRems").document(SRI).get()
+      if sentence_doc.exists:
+        sentence = sentence_doc.to_dict().get("sentence")
     
     user_folder = get_user_folder(user_id)
     version = get_next_version(user_folder)
@@ -170,7 +182,7 @@ def makeRecording():
 
     recording_file.save(filepath)
 
-    transcribe_file = detect_stutter(filepath, user_id, version)
+    transcribe_file = detect_stutter(filepath, user_id, version, sentence_text= sentence)
 
     return jsonify({
     "message": "Voice memo saved",
@@ -205,10 +217,10 @@ def uploadSong():
     return jsonify({
         "success": True,
         "id": song_id,
-        # "lyricsFound": len(lyrics), - Lyrics Not In Function Otherwise
+        
     }), 201
     
-# Need To Call This Endpoint When Done, Do Most By Self
+# Organize Endpoint
 @app.route("/stutterSeverity", methods = ["POST", "GET"])
 def stutterSeverity():
     user_id = request.args.get("userId") or request.form.get("userId")
@@ -232,8 +244,15 @@ def stutterSeverity():
 
     doc_ref = db.collection("transcripts").document(f"{user_id}_v{version_num}")
 
+    parent_doc = doc_ref.get()
+    sentence = None
+    if parent_doc.exists:
+        sentence = parent_doc.to_dict().get("sentence")
+
     text_doc = doc_ref.collection("text").document("full").get()
     scores_doc = doc_ref.collection("scores").document("full").get()
+
+    
 
 
     if not text_doc.exists or not scores_doc.exists:
@@ -262,11 +281,32 @@ def stutterSeverity():
     separate_text = [word.lower().strip() for word in separate_text]
     w = 0 
 
+
     while w < len(separate_text):
         if (w + 1 < len(separate_text)) and separate_text[w] == separate_text[w + 1]:
             number_Stutters += 1
 
         w += 1
+
+    partial_stutters = 0
+    words_stuttered = []
+    sentence_words = sentence.split()
+
+    # Do Front/Backend Thing and Partial Report Thursday
+    # Debug Sentence ASAP
+
+    for wrd in sentence_words:
+        iter_builder = [] 
+        lenWrd = len(wrd) - 1 
+        for a in range(lenWrd):
+            iter_builder.append(wrd[:a + 1]) 
+
+        for pt in iter_builder:
+            if pt in separate_text:
+                partial_stutters += 1
+                
+
+       
 
     
     if avg_Word_Score <= .400 and number_Stutters == 1:
@@ -356,3 +396,10 @@ def displayInfo():
 if __name__ == "__main__":
     app.run(port=5001)
 
+
+
+# REPORTS WILL BE HOW MANY WORDS REPEATED, EXAMPLES OF IT
+# OR: Stutter Level / What Caused It (Full Word, Partial Word or Score) / Examples Found / Song and BPM Reccomendation / Maybe More
+# Main Logic Before Sam Makes 3 Recordings Critical, Reports After
+
+# More Specific Song Recs and Numbers Later
