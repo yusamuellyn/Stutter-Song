@@ -136,7 +136,7 @@ def detect_stutter(audio_path = None, user_id = None, version_num = None, senten
 @app.route("/get-sentence", methods = ["GET"])
 def getSentence():
 
-    randomSentenceNums = random.sample(range(1,16),3)
+    randomSentenceNums = random.sample(range(1,30),3)
 
  
     doc_ref = db.collection("Sentences").document("SkROjYeo8NiV76JyRnfR")
