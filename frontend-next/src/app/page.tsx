@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 async function uploadMemo(blob: Blob, userId:string, SRI:string | null, sentenceIndex: number) {
   const formData = new FormData();
   formData.append("recording", blob, "recording.mp4");
@@ -13,7 +15,7 @@ async function uploadMemo(blob: Blob, userId:string, SRI:string | null, sentence
   }
   if(SRI){formData.append("SRI", SRI )}
 
-  const response = await fetch("http://localhost:5001/makeRecording", {
+  const response = await fetch(`${API_URL}/makeRecording`, {
     method: "POST",
     body: formData,
   });
@@ -114,7 +116,7 @@ function RecordingButton({ sentences, currentIndex, setCurrentIndex, SRI }: Reco
   // Liam - Understand This Too
   const analyzeStutter = async () => {
     try {
-      const response = await fetch(`http://127.0.0.1:5001/stutterSeverity?userId=${userIdRef.current}`, {
+      const response = await fetch(`${API_URL}/stutterSeverity?userId=${userIdRef.current}`, {
         method: "POST",
       });
 
@@ -127,7 +129,7 @@ function RecordingButton({ sentences, currentIndex, setCurrentIndex, SRI }: Reco
       const data = await displayStutter();
 
       const songRes = await fetch(
-        `http://127.0.0.1:5001/display-song?userId=${userIdRef.current}`
+        `${API_URL}/display-song?userId=${userIdRef.current}`
       );
       const songData = await songRes.json();
 
@@ -143,7 +145,7 @@ function RecordingButton({ sentences, currentIndex, setCurrentIndex, SRI }: Reco
   };
 
   const displayStutter = async () => {
-    const response = await fetch(`http://localhost:5001/displaySev?userId=${userIdRef.current}`, {
+    const response = await fetch(`${API_URL}/displaySev?userId=${userIdRef.current}`, {
       method: "GET",
     });
 
@@ -206,7 +208,7 @@ const [currentIndex, setCurrentIndex] = useState(0);
   const [SRI, setSRI] = useState(null);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5001/get-sentence")
+    fetch(`${API_URL}/get-sentence`)
     .then((res) => res.json())
     .then((data) => {
       setSentences(data.sentence ?? []);

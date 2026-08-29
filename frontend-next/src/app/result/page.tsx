@@ -10,6 +10,8 @@ declare global {
   }
 }
 
+const YOUTUBE_IFRAME_API_URL = "https://www.youtube.com/iframe_api";
+
 export default function ResultPage() {
   const params = useSearchParams();
   const router = useRouter();
@@ -27,7 +29,7 @@ export default function ResultPage() {
     // Load the IFrame API script once
     if (!window.YT) {
       const tag = document.createElement("script");
-      tag.src = "https://www.youtube.com/iframe_api";
+      tag.src = YOUTUBE_IFRAME_API_URL;
       document.body.appendChild(tag);
     }
 

@@ -416,6 +416,11 @@ def displayInfo():
     sL = data.get("stutterLevel")
     
     return jsonify({"StutterLevel": sL})
+
+@app.route("/getReport", methods = ["GET"])
+def generateReport():
+    user_id = request.args.get("userId") or request.form.get("userId")
+    
    
 
 if __name__ == "__main__":
