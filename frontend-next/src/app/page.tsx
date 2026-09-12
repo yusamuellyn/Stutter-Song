@@ -15,7 +15,7 @@ async function uploadMemo(blob: Blob, userId:string, SRI:string | null, sentence
   }
   if(SRI){formData.append("SRI", SRI )}
 
-  const response = await fetch(`${API_URL}/makeRecording`, {
+  const response = await fetch(`${API_URL}/recordings/makeRecording`, {
     method: "POST",
     body: formData,
   });
@@ -116,7 +116,7 @@ function RecordingButton({ sentences, currentIndex, setCurrentIndex, SRI }: Reco
   // Liam - Understand This Too
   const analyzeStutter = async () => {
     try {
-      const response = await fetch(`${API_URL}/stutterSeverity?userId=${userIdRef.current}`, {
+      const response = await fetch(`${API_URL}/stutter/stutterSeverity?userId=${userIdRef.current}`, {
         method: "POST",
       });
 
@@ -129,7 +129,7 @@ function RecordingButton({ sentences, currentIndex, setCurrentIndex, SRI }: Reco
       const data = await displayStutter();
 
       const songRes = await fetch(
-        `${API_URL}/display-song?userId=${userIdRef.current}`
+        `${API_URL}/songs/display-song?userId=${userIdRef.current}`
       );
       const songData = await songRes.json();
 
@@ -145,7 +145,7 @@ function RecordingButton({ sentences, currentIndex, setCurrentIndex, SRI }: Reco
   };
 
   const displayStutter = async () => {
-    const response = await fetch(`${API_URL}/displaySev?userId=${userIdRef.current}`, {
+    const response = await fetch(`${API_URL}/stutter/displaySev?userId=${userIdRef.current}`, {
       method: "GET",
     });
 
@@ -208,7 +208,7 @@ const [currentIndex, setCurrentIndex] = useState(0);
   const [SRI, setSRI] = useState(null);
 
   useEffect(() => {
-    fetch(`${API_URL}/get-sentence`)
+    fetch(`${API_URL}/sentences/get-sentence`)
     .then((res) => res.json())
     .then((data) => {
       setSentences(data.sentence ?? []);
