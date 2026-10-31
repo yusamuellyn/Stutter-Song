@@ -50,7 +50,7 @@ def makeRecording():
 
     recording_file.save(filepath)
 
-    transcribe_file = detect_stutter(filepath, user_id, version, sentence_text= sentence)
+    transcribe_file = detect_stutter(filepath, user_id, version, sentence_text= sentence, sentence_index= sentence_index)
 
     return jsonify({
     "message": "Voice memo saved",

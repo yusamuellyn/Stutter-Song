@@ -1,7 +1,7 @@
 import os
-import whisperx
 import firebase_admin
 from firebase_admin import credentials, firestore
+from core.stutter_model import StutterDetector
 
 def get_next_version(user_folder):
     existing = [f for f in os.listdir(user_folder) if f.startswith("rec_v")]
@@ -32,7 +32,6 @@ def get_last_n_versions(user_folder, n=3):
     return versions[:n]
 
 device = "cpu"
-ts_model = whisperx.load_model("large-v3", device)
 
 audio_folder = "recordings"
 os.makedirs(audio_folder, exist_ok= True)
@@ -47,7 +46,7 @@ cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-model = None
+model = StutterDetector("StutterSongModel.pt", device)
 
 def get_version_number(filename):
     return int(filename.split("_v")[1].split(".")[0])

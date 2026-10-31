@@ -4,6 +4,38 @@ from core.state import db, get_user_folder, get_last_n_versions, get_latest_vers
 
 stutter_bp = Blueprint("stutter", __name__, url_prefix="/stutter")
 
+LEVELS = ["No Stutter", "Warning", "Minor", "Average", "Major"]
+SONG_TIERS = {"Minor": "faster", "Average": "slower", "Major": "slowest"}
+
+# Warning:      1 type / 1 instance              (no song)
+# Faster song:  1 or 2 types AND 2-3 instances   -> Minor
+# Slower song:  2 or 3 types AND 4-5 instances   -> Average
+# Slowest song: all types AND 6+ instances       -> Major
+# Instances set the level; the number of types caps or raises it into the allowed range.
+def level_from_counts(instances, num_types):
+    if instances == 0:
+        return "No Stutter"
+    if instances == 1:
+        level = 1
+    elif instances <= 3:
+        level = 2
+    elif instances <= 5:
+        level = 3
+    else:
+        level = 4
+    low, high = {1: (1, 2), 2: (2, 3)}.get(num_types, (3, 4))
+    return LEVELS[min(max(level, low), high)]
+
+def sentence_for(transcript_doc):
+    # "sentence" holds every sentence in the session; "sentenceIndex" picks the one read
+    if not transcript_doc.exists:
+        return None
+    data = transcript_doc.to_dict()
+    sentence, idx = data.get("sentence"), data.get("sentenceIndex")
+    if isinstance(sentence, list):
+        return sentence[idx] if idx is not None and 0 <= idx < len(sentence) else None
+    return sentence
+
 # Organize Endpoint
 @stutter_bp.route("/stutterSeverity", methods = ["POST", "GET"])
 def stutterSeverity():
@@ -16,108 +48,37 @@ def stutterSeverity():
     if not versions:
         return jsonify({"error": "No previous versions found"}), 400
     
-    stutterLevel = "None"
-    
-    scores = []
-    number_Stutters = 0
-    # existing = [f for f in os.listdir(audio_folder) if f.startswith("most_recent_rec_v")]
-    
-    # if not existing:
-    #     return jsonify({"Error: No Previous Versions Found"}), 400
+    # StutterSongModel.pt results saved per recording in transcription.detect_stutter
+    type_counts = {}
+    recordings = []
 
-    # last_file = max(existing, key=get_version_number)
-    # version_num = get_version_number(last_file)
-
-    for version_num in versions:
+    for version_num in sorted(versions):
         doc_ref = db.collection("transcripts").document(f"{user_id}_v{version_num}")
+        model_doc = doc_ref.collection("model").document("full").get()
 
-        parent_doc = doc_ref.get()
-        sentence = None
-        if parent_doc.exists:
-            sentence = parent_doc.to_dict().get("sentence")
-
-        text_doc = doc_ref.collection("text").document("full").get()
-        scores_doc = doc_ref.collection("scores").document("full").get()
-
-    
-
-
-        if not text_doc.exists or not scores_doc.exists:
+        if not model_doc.exists:
             continue
 
-        text_data = text_doc.to_dict()
-        scores_data = scores_doc.to_dict()
+        model_data = model_doc.to_dict()
+        stutters = []
+        for name, t in model_data["types"].items():
+            type_counts[name] = type_counts.get(name, 0) + t["num_segments"]
+            for seg in t["segments"]:
+                stutters.append({"type": name, "start": seg["start"], "end": seg["end"]})
 
-        text = text_data["text"]
-        version_scores = scores_data["scores"]
+        recordings.append({
+            "version": version_num,
+            "sentence": sentence_for(doc_ref.get()),
+            "duration": model_data["duration_s"],
+            "stutters": sorted(stutters, key=lambda s: s["start"]),
+        })
 
-        if not version_scores:
-         continue
-            
-        scores.extend(version_scores)
+    if not recordings:
+        return jsonify({"Error: No Model Results Found"}), 404
 
-        separate_text = text.split()
-        separate_text = [word.lower().strip() for word in separate_text]
-        w = 0
-        while w < len(separate_text):
-            if (w + 1 < len(separate_text)) and separate_text[w] == separate_text[w + 1]:
-                    number_Stutters += 1
-            w += 1
-        
-
-    if not scores:
-        return jsonify({"Error: No Scores Found"}), 404
-
-    avg_Word_Score = 0 
-
-    for s in scores:
-        avg_Word_Score = avg_Word_Score + float(s)
-
-    avg_Word_Score = avg_Word_Score / len(scores)
-
-
-    separate_text = [word.lower().strip() for word in separate_text]
-    w = 0 
-
-
-    while w < len(separate_text):
-        if (w + 1 < len(separate_text)) and separate_text[w] == separate_text[w + 1]:
-            number_Stutters += 1
-
-        w += 1
-
-    partial_stutters = 0
-    words_stuttered = []
-    sentence_words = sentence.split()
-
-    # Do Front/Backend Thing and Partial Report Thursday
-    # Debug Sentence ASAP
-
-    for wrd in sentence_words:
-        iter_builder = [] 
-        lenWrd = len(wrd) - 1 
-        for a in range(lenWrd):
-            iter_builder.append(wrd[:a + 1]) 
-
-        for pt in iter_builder:
-            if pt in separate_text:
-                partial_stutters += 1
-                
-
-       
-
-    
-    if avg_Word_Score <= .400 and number_Stutters == 1:
-        stutterLevel = "Minor"
-
-    elif avg_Word_Score <= .300 and (number_Stutters == 2 or number_Stutters == 3):
-        stutterLevel = "Average"
-
-    elif avg_Word_Score <= .200 and number_Stutters > 4:
-        stutterLevel = "Major"
-
-    else:
-        stutterLevel = "No Stutter"
+    instances = sum(type_counts.values())
+    types_found = [name for name, count in type_counts.items() if count > 0]
+    stutterLevel = level_from_counts(instances, len(types_found))
 
     recordingName = f"{user_id}_v{versions[0]}"
 
@@ -125,15 +86,21 @@ def stutterSeverity():
     # Liam - Understand Below  
     doc_data = { 
         "recordingName": recordingName,
-        "stutterLevel": stutterLevel
-
+        "stutterLevel": stutterLevel,
+        "songTier": SONG_TIERS.get(stutterLevel),
+        "instances": instances,
+        "typesFound": types_found,
+        "typeCounts": type_counts,
+        "recordings": recordings,
         }
 
     db.collection("stutters").document(recordingName).set(doc_data)
     return jsonify({
             "success": True,
             "id": recordingName,
-            
+            "stutterLevel": stutterLevel,
+            "instances": instances,
+            "typesFound": types_found,
         }), 201
 
 @stutter_bp.route("/displaySev", methods = ["GET"])
@@ -156,4 +123,9 @@ def displayInfo():
     data = doc.to_dict()  # turns the document into a normal Python dict
     sL = data.get("stutterLevel")
     
-    return jsonify({"StutterLevel": sL})
+    return jsonify({
+        "StutterLevel": sL,
+        "instances": data.get("instances", 0),
+        "typesFound": data.get("typesFound", []),
+        "recordings": data.get("recordings", []),
+    })
