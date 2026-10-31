@@ -137,6 +137,10 @@ function RecordingButton({ sentences, currentIndex, setCurrentIndex, SRI }: Reco
         level: String(data.StutterLevel),
         youtubeId: songData.youtubeId ?? "",
         songTitle: songData.title ?? "",
+        artist: songData.artist ?? "",
+        bpm: songData.bpm ? String(songData.bpm) : "",
+        message: songData.message ?? "",
+        reason: songData.reason ?? "",
       });
       router.push(`/result?${params.toString()}`);
     } catch (err) {
@@ -222,6 +226,14 @@ return (
       <p className="mb-6 font-mono text-xs uppercase tracking-[0.2em] text-[#2E8B57]">
         StutterSong
       </p>
+
+      <div role="note" className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-left text-sm text-amber-900">
+        <p className="font-semibold">Before you record</p>
+        <p className="mt-1">
+          You must speak clearly and slowly when reading each sentence. Rushed or mumbled speech
+          can make the results inaccurate.
+        </p>
+      </div>
 
       <ol className="space-y-4 text-left">
         {sentences.map((s, i) => {
