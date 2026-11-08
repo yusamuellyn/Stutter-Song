@@ -44,7 +44,7 @@ If you would like access to our model to use in your project, please contact us 
 
 
 **Contact** 
-- Liam Fowler - liam5140@aol.com \
+- Liam Fowler - liam5140@aol.com 
 - Sam Yu - @your_twitter - email@example.com
 
 Project Link: https://github.com/yusamuellyn/StutterSong
