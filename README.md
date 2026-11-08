@@ -11,7 +11,7 @@ So, by simply speaking into our app, the users get accurate information on the w
 
 
 
-**Built With**
+**Built With** \
 Our Major Tools And Frameworks Include:
 
 1. Next.JS
@@ -26,34 +26,33 @@ Our project is available to run at: [WEBSITE LINK]
 
 - To run the project locally, please contact us with the information below. 
 
-
+\
 
 **Usage**
 Demo Screenshots Coming Soon!
 
-
+\
 
 **Roadmap**
 1. Optimizations
 2. Potentially: Model accuracy improvements, better display metrics, etc. 
 
-
+\
 
 **Contributing**
 If you would like access to our model to use in your project, please contact us with the information below!
 
-
-
+\
 
 **Contact**
-Liam Fowler - liam5140@aol.com
+Liam Fowler - liam5140@aol.com \
 Your Name - @your_twitter - email@example.com
 
 Project Link: https://github.com/yusamuellyn/StutterSong
 Website Link: [WEBSITE LINK]
 
-(back to top)
+\
 
-Acknowledgments
+**Acknowledgments**
 Claude
 Next.JS, Typescript, Pytorch, SciKit-Learn Official Documentation 
