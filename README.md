@@ -19,6 +19,7 @@ Our Major Tools And Frameworks Include:
 3. Typescript
 4. SciKit-Learn
 5. Pytorch
+6. SEP-28k Dataset (20k Audio Recordings) 
 
 
 **Getting Started** \
