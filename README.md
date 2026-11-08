@@ -1,18 +1,6 @@
-Table of Contents
-About The Project
-Built With
-Getting Started
-Prerequisites
-Installation
-Usage
-Roadmap
-Contributing
-License
-Contact
-Acknowledgments
+**About The Project** 
 
-About The Project
-StutterSong is a web app designed to help people improve their speaking ability if they have stutters, specifically through the use of song.
+- StutterSong is a web app designed to help people improve their speaking ability if they have stutters, specifically through the use of song.
 
 To use StutterSong, you must carefully speak into our audio recording framework, with 3 example sentences appearing on the screen while you do so. 
 After an almost instant interpretation time, our custom Machine Learning model evaluates your recordings for prolonged speech, repetition and any filler words like "um".
@@ -21,43 +9,43 @@ Also based on the speed and difficulty of the song, a YouTube link to one of man
 So, by simply speaking into our app, the users get accurate information on the way they speak and get shown a song to help them speak more fluently through out-of-app practice. 
 
 
-(back to top)
 
-Built With
+
+**Built With**
 Our Major Tools And Frameworks Include:
 
-Next.JS
-Tailwind CSS
-Typescript
-SciKit-Learn
-Pytorch
-(back to top)
+1. Next.JS
+2. Tailwind CSS
+3. Typescript
+4. SciKit-Learn
+5. Pytorch
 
-Getting Started
+
+**Getting Started**
 Our project is available to run at: [WEBSITE LINK]
 
 - To run the project locally, please contact us with the information below. 
 
-(back to top)
 
-Usage
+
+**Usage**
 Demo Screenshots Coming Soon!
 
-(back to top)
 
-Roadmap
+
+**Roadmap**
 1. Optimizations
 2. Potentially: Model accuracy improvements, better display metrics, etc. 
 
-(back to top)
 
-Contributing
+
+**Contributing**
 If you would like access to our model to use in your project, please contact us with the information below!
 
-(back to top)
 
 
-Contact
+
+**Contact**
 Liam Fowler - liam5140@aol.com
 Your Name - @your_twitter - email@example.com
 
