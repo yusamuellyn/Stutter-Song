@@ -32,7 +32,7 @@ Demo Screenshots Coming Soon!
 
 
 
-**Roadmap** \
+**Roadmap** 
 1. Optimizations
 2. Potentially: Model accuracy improvements, better display metrics, etc. 
 
@@ -43,15 +43,15 @@ If you would like access to our model to use in your project, please contact us 
 
 
 
-**Contact** \ 
-Liam Fowler - liam5140@aol.com \
-Your Name - @your_twitter - email@example.com
+**Contact** 
+- Liam Fowler - liam5140@aol.com \
+- Sam Yu - @your_twitter - email@example.com
 
 Project Link: https://github.com/yusamuellyn/StutterSong
 Website Link: [WEBSITE LINK]
 
 
 
-**Acknowledgments** \
+**Acknowledgments**
 - Claude
 - Next.JS, Typescript, Pytorch, SciKit-Learn Official Documentation 
