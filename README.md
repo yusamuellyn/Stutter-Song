@@ -43,16 +43,10 @@ Demo Screenshots Coming Soon!
 If you would like access to our model to use in your project, please contact us with the information below!
 
 
-
 **Contact** 
 - Liam Fowler - liam5140@aol.com 
-- Sam Yu - @your_twitter - email@example.com
+- Sam Yu - syu12@binghamton.edu
 
 Project Link: https://github.com/yusamuellyn/StutterSong
 Website Link: [WEBSITE LINK]
 
-
-
-**Acknowledgments**
-- Claude
-- Next.JS, Typescript, Pytorch, SciKit-Learn Official Documentation 
