@@ -33,7 +33,7 @@ def get_last_n_versions(user_folder, n=3):
 
 device = "cpu"
 
-audio_folder = "recordings"
+audio_folder = os.environ.get("RECORDINGS_DIR", "recordings")
 os.makedirs(audio_folder, exist_ok= True)
 
 audio_path = os.path.join(audio_folder, "most_recent_rec.mp4")
@@ -42,7 +42,9 @@ recording_extensions = {"mp4", "wav", "webm"}
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in recording_extensions
 
-cred = credentials.Certificate("serviceAccountKey.json")
+cred = credentials.Certificate(
+    os.environ.get("FIREBASE_CREDENTIALS_PATH", "serviceAccountKey.json")
+)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
