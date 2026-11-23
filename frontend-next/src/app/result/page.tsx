@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 declare global {
@@ -64,6 +64,18 @@ function groupByType(stutters: RecordingSummary["stutters"]) {
 }
 
 export default function ResultPage() {
+  return (
+    <Suspense fallback={
+      <main className="flex min-h-screen items-center justify-center bg-[#F4FAF7] px-4 py-10">
+        <p role="status" className="text-stone-600">Loading results…</p>
+      </main>
+    }>
+      <ResultContent />
+    </Suspense>
+  );
+}
+
+function ResultContent() {
   const params = useSearchParams();
   const router = useRouter();
   const playerRef = useRef<HTMLDivElement>(null);
