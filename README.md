@@ -1,4 +1,4 @@
-# BrainWave / Stutter-Song
+# Stutter-Song
 
 BrainWave is a speech-practice prototype that analyzes short recordings and recommends songs with lyric videos. The frontend uses Next.js and React; the backend uses Flask, PyTorch, Wav2Vec2, and Firebase Firestore.
 
