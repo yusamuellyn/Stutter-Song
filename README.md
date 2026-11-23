@@ -7,7 +7,7 @@ BrainWave is a speech-practice prototype that analyzes short recordings and reco
 1. The app retrieves three practice sentences from Firestore.
 2. The user records each sentence in the browser.
 3. The backend saves the recordings and analyzes them for interjections, repetitions, and prolongations/blocks.
-4. The app combines results from the user's latest three recordings into an application-defined severity level.
+4. The app combines results from the user's latest three recordings with our custom machine learning model (described below) into an application-defined severity level.
 5. When a song is recommended, the results page displays a YouTube lyric video. Recommendations consider tempo, song tags, and recently recommended songs.
 
 ## Requirements
@@ -23,6 +23,7 @@ On macOS with Homebrew, install FFmpeg with:
 ```bash
 brew install ffmpeg
 ```
+
 
 ## Backend setup
 
@@ -51,6 +52,34 @@ python server.py
 The API runs at [http://localhost:5001](http://localhost:5001). The root URL returns 404 because no `/` route is defined. Keep this terminal running.
 
 Startup loads the checkpoint and the `facebook/wav2vec2-base` backbone. The first run may download the backbone; subsequent runs can use its local cache. The backend currently uses the CPU. Run from `Backend` because credential, model, and recording paths are relative to the working directory.
+
+
+
+# Model Description
+
+This model is designed to detect and classify stuttering events in 3-second audio clips. It is deployed as the back-end classifier for our stutter-detection web application.
+
+## 1. Core Architecture & Feature Extraction:
+- **Feature Backbone:** `facebook/wav2vec2-base` 
+- **Optimal Representations:** Rather than relying on a single final layer, the system extracts sequence representations from **Layers 6 and 9** of Wav2Vec2.
+- **Temporal Resolution:** Frames are downsampled using a 1D Average Pooling layer (pooling kernel size = 2) to condense the representations into 74 time steps per 3-second window. 
+- **Classifier Head (Temporal CNN):**
+  - Layer Normalization is applied directly to incoming features to stabilize scales.
+  - A 2-layer 1D Convolutional Neural Network (kernel size = 5).
+  - **Dual Pooling:** Both Global Max Pooling (to capture transient, short stuttering events anywhere in the window) and Global Average Pooling (to capture the overall context) are concatenated.
+
+## 2. Target Classes & Label Merging:
+To combat individual annotator bias and improve model precision, original annotations were aggregated into three consolidated categories:
+1. **Interjection**
+2. **Repetition** 
+3. **Prolongation / Block** 
+
+## 3. Key Training Techniques That Worked Best (Optimization):
+- **Ignoring Unsure Clips:** Clips where judges were highly split (e.g., 1-of-3 judges flagged a stutter) were ignored during training.
+- **Temporal Masking (Data Augmentation):** Randomly blanking out short segments of the audio embeddings (~40–240 ms) during training prevented overfitting.
+- **Improved Optimization Recipe:** Shifting to **AdamW** with weight decay (`1e-2`), employing a **Cosine Annealing Learning Rate Schedule**, and enforcing gradient clipping (`1.0`).
+- **Ensembling:** The production pipeline uses an ensemble of 5 identical networks trained with different random seeds.
+
 
 ## Frontend setup
 
@@ -85,6 +114,7 @@ npm start
 
 `npm start` serves an existing production build, so run `npm run build` first.
 
+
 ## Lyric-video song catalog
 
 The seed catalog lives in `Backend/songs.py`. It contains 25 songs with YouTube lyric-video IDs, BPM values, legacy threshold labels, and descriptive tags.
@@ -107,6 +137,7 @@ The uploader validates the full catalog, backs up existing song documents to a J
 
 Each song record includes `youtubeId`, `youtubeUrl`, `youtubeTitle`, `youtubeChannel`, `videoType: "lyric"`, `bpm`, `songTier`, `threshold`, and `tags`.
 
+
 ### Tempo categories
 
 The current recommendation route sorts the catalog by BPM and divides it into three groups. The uploader stores matching `songTier` values:
@@ -118,6 +149,7 @@ The current recommendation route sorts the catalog by BPM and divides it into th
 | `faster` | 7 | Minor |
 
 These are relative groups within the catalog, not fixed BPM ranges. Counts and boundaries can change as songs are added. The older `threshold` field is retained for compatibility; the recommendation route uses the three tempo groups and song tags. No song is recommended for the `No Stutter` or `Warning` levels.
+
 
 ## Project layout
 
